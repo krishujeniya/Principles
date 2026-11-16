@@ -1,0 +1,110 @@
+name: Principles completeness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Psychology/Web/**
+      - .github/workflows/principles-completeness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  completeness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check source preservation and merged catalogue
+        shell: python
+        run: |
+          from pathlib import Path
+          import hashlib
+          import os
+          import re
+
+          root = Path('Psychology/Web')
+          data = (root / 'principles.md').read_bytes()
+          text = data.decode('utf-8')
+          inventory = text.split('## Source inventory\n', 1)[1].split('### Inherited source register', 1)[0]
+          manifest = re.findall(
+              r'^\| \[(WEB\d+)\]\([^\n]+?\) \| `([^`]+)` \| (\d+) \| (\d+) \| `([0-9a-f]{64})` \|$',
+              inventory, re.M)
+          expected_names = {
+              'Apple_Principles_Mapped_2026.md', 'Google_Principles_Mapped_2026.md',
+              'Instagram_Principles_Mapped_2026.md', 'Principles_List.md',
+              'Psychology-Principles-for-Product-Designers-2026.md',
+              'psychology_principles_master_list.md',
+          }
+          assert len(manifest) == 6, 'Expected six source records'
+          assert {row[1] for row in manifest} == expected_names, 'Source inventory differs'
+          originals = {}
+          for sid, name, byte_count, line_count, digest in manifest:
+              marker = f'<!-- BEGIN SOURCE {sid} -->\n'.encode()
+              assert data.count(marker) == 1, f'Duplicate source marker: {sid}'
+              position = data.index(marker) + len(marker)
+              fence_end = data.index(b'\n', position)
+              opening = data[position:fence_end]
+              assert re.fullmatch(rb'`{3,}markdown', opening), f'Invalid source fence: {sid}'
+              start = fence_end + 1
+              body = data[start:start + int(byte_count)]
+              assert hashlib.sha256(body).hexdigest() == digest, f'Source hash mismatch: {name}'
+              assert len(body.splitlines()) == int(line_count), f'Source line mismatch: {name}'
+              fence = opening[:-len(b'markdown')]
+              closing = (b'' if body.endswith(b'\n') else b'\n') + fence
+              closing += f'\n<!-- END SOURCE {sid} -->'.encode()
+              assert data.startswith(closing, start + len(body)), f'Invalid source closing: {sid}'
+              assert (root / name).read_bytes() == body, f'Current source differs: {name}'
+              originals[name] = body.decode('utf-8')
+          current_sources = {
+              p.relative_to(root).as_posix() for p in root.rglob('*')
+              if p.is_file() and p.suffix.lower() in {'.md', '.markdown'}
+              and p != root / 'principles.md'
+              and not set(p.relative_to(root).parts) & {'.git', '.agents', '.aws', '.codex'}
+          }
+          assert current_sources == expected_names, 'A Markdown source is missing or absent from the merge'
+
+          base = originals['Principles_List.md']
+          original = base.split('## Numbered principles list\n', 1)[1].split('## Appendix A', 1)[0].strip()
+          merged = text.split('<!-- BEGIN MERGED CATALOGUE -->', 1)[1].split('<!-- END MERGED CATALOGUE -->', 1)[0]
+          entry_pattern = r'^(\d+)\. \*\*(.+?)\*\*[ \t]*$'
+          entries = re.findall(entry_pattern, original, re.M)
+          assert len(entries) == 283, 'Expected 283 source entries'
+          assert re.findall(entry_pattern, merged, re.M) == entries, 'Entries missing, renamed, reordered or duplicated'
+          assert [int(row[0]) for row in entries] == list(range(1, 284)), 'Entry numbers have gaps'
+          assert len(re.findall(r'^   \| \[(Apple|Google|Instagram) / WEB\d+\]', merged, re.M)) == 849
+
+          for company, name in [
+              ('Apple', 'Apple_Principles_Mapped_2026.md'),
+              ('Google', 'Google_Principles_Mapped_2026.md'),
+              ('Instagram', 'Instagram_Principles_Mapped_2026.md'),
+          ]:
+              rows = [line for line in originals[name].splitlines() if re.match(r'^\|\s*\d+\s*\|', line)]
+              assert len(rows) == 283, f'Expected 283 rows: {company}'
+              numbers = []
+              for row in rows:
+                  cells = [cell.strip() for cell in re.split(r'(?<!\\)\|', row.strip().strip('|'))]
+                  number = int(cells[0])
+                  numbers.append(number)
+                  start = merged.index(f'<a id="principle-{number:03}"></a>')
+                  end = merged.find('<a id=', start + 1)
+                  entry = merged[start:end if end != -1 else len(merged)]
+                  mapping = next(line for line in entry.splitlines() if line.startswith(f'   | [{company} /'))
+                  assessment = cells[3] if company == 'Instagram' else cells[4]
+                  assert assessment in mapping, f'Mapping assessment missing: {company} #{number}'
+                  assert f'| {cells[2].strip("*")} |' in mapping or '**Unresolved' in mapping
+              assert numbers == list(range(1, 284)), f'Duplicate or missing mapping number: {company}'
+          assert merged.count('**Unresolved — title mismatch**') == 16
+
+          tokens = list(re.finditer(r'^(?:### .+|\d+\. \*\*.+?\*\*)[ \t]*$', original, re.M))
+          for index, token in enumerate(tokens):
+              end = tokens[index + 1].start() if index + 1 < len(tokens) else len(original)
+              block = original[token.start():end].rstrip()
+              assert block in merged, 'A definition, caveat or subprinciple was changed or omitted'
+          print('PASS: 6 complete sources; 283 entries; 849 mappings; 16 flagged label errors; all definition blocks retained.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
+              report.write(f'Commit: `{os.environ["GITHUB_SHA"]}`\n\n')
+              report.write('PASS: all 6 source archives match their recorded SHA-256 and line counts.\n\n')
+              report.write('PASS: all 283 definitions and 849 company assessments retained; 16 Instagram label mismatches flagged.\n')
