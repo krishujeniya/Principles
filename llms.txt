@@ -1,0 +1,10 @@
+# Principles Knowledge Base
+
+> Cognitive prompts, behavioral psychology frameworks, and engineering governance.
+> Authored by Krish Ujeniya (@krishujeniya).
+> Developer Profile: https://github.com/krishujeniya
+> Ecosystem: https://krishujeniya.github.io/MostlyOutlier/
+> Repository: https://github.com/krishujeniya/Principles
+
+## Overview
+Comprehensive reference repository providing structured frameworks for prompt engineering, cognitive modeling, and software engineering governance across Krish Ujeniya's autonomous agent systems.
