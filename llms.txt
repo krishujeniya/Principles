@@ -3,7 +3,7 @@
 > Cognitive prompts, behavioral psychology frameworks, and engineering governance.
 > Authored by Krish Ujeniya (@krishujeniya).
 > Developer Profile: https://github.com/krishujeniya
-> Ecosystem: https://krishujeniya.github.io/MostlyOutlier/
+> Ecosystem: https://mostlyoutlier.pages.dev/
 > Repository: https://github.com/krishujeniya/Principles
 
 ## Overview

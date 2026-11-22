@@ -2,7 +2,7 @@
 
 > Authored and compiled by Krish Ujeniya (@krishujeniya).  
 > GitHub: [https://github.com/krishujeniya](https://github.com/krishujeniya)  
-> Ecosystem: [MostlyOutlier](https://krishujeniya.github.io/MostlyOutlier/)
+> Ecosystem: [MostlyOutlier](https://mostlyoutlier.pages.dev/)
 
 ## Overview
 A curated knowledge repository synthesizing behavioral psychology models, cognitive prompt patterns, and systems engineering principles used across Krish Ujeniya's software projects (AGYOS, Hadron, TraceMigo, and ResolveHelm).
